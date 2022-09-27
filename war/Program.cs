@@ -3,12 +3,15 @@ using Microsoft.AspNetCore.Diagnostics;
 using war.Exceptions;
 using war.models;
 using war.services;
+using war.Store;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.Configure<DbSettings>(builder.Configuration.GetSection("Db"));
-builder.Services.AddSingleton<DbService>();
+builder.Services.AddScoped<ICardService, CardService>();
+builder.Services.AddScoped<IMatchService, MatchService>();
+builder.Services.AddScoped<IMongoContext, MongoContext>();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

@@ -1,6 +1,19 @@
 namespace war.services;
 
-public class CardService
+public interface ICardService
+{
+    List<int> ShuffleCards();
+
+    /// <summary>
+    /// This will divide one-by-one all shuffled cards to both players
+    /// </summary>
+    /// <param name="shuffledCards"></param>
+    /// <param name="playerOneCards"></param>
+    /// <param name="playerTwoCards"></param>
+    void DivideCardsToPlayers(List<int> shuffledCards, ICollection<int> playerOneCards, ICollection<int> playerTwoCards);
+}
+
+public class CardService : ICardService
 {
     public List<int> ShuffleCards()
     {

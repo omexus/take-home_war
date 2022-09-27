@@ -1,26 +1,36 @@
 using System.Collections.Immutable;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using war.Exceptions;
 using war.models;
 using war.Requests;
 using war.Responses;
+using war.Store;
 using Match = war.models.Match;
 
 namespace war.services;
 
-public class DbService
+
+public interface IMatchService
 {
-    private readonly IMongoCollection<Match> _matches;
-    private readonly IMongoCollection<Player> _players;
-    
-    public DbService(IOptions<DbSettings> dbSettings)
+    Task<PlayerMatchResponse?> CreateMatch(PlayerRequest playerRequest);
+    Task<PlayerMatchResponse> JoinMatch(string matchId, PlayerRequest playerRequest);
+    Task<PlayerResponse?> GetPlayerWithResponse(string playerId);
+    Task<MatchResponse?> GetMatchWithResponse(string matchId);
+    Task<List<OpenMatchResponse>> GetOpenedMatches();
+    Task<PlayerMatchResponse> StartMatch(string matchId, string playerId);
+    Task<PlayerMatchResponse> DrawCard(string matchId, string userId);
+}
+
+public class MatchService: IMatchService
+{
+    private readonly IMongoContext _dbContext;
+    private readonly ICardService _cardService;
+
+    public MatchService(IMongoContext dbContext, ICardService cardService)
     {
-        var client = new MongoClient(dbSettings.Value.ConnectionString);
-        var db = client.GetDatabase(dbSettings.Value.Db);
-        _matches = db.GetCollection<Match>("match");
-        _players = db.GetCollection<Player>("player");
+        _dbContext = dbContext;
+        _cardService = cardService;
     }
 
     /// <summary>
@@ -35,7 +45,7 @@ public class DbService
         if (playerRequest?.Id == null)
         {
             player = new Player();
-            await _players.InsertOneAsync(player);
+            await _dbContext.Players.InsertOneAsync(player);
             playerRequest ??= new PlayerRequest();
             playerRequest.Id = player.Id;
         }
@@ -58,14 +68,14 @@ public class DbService
             CreatedTime = DateTime.UtcNow
         };
 
-        await _matches.InsertOneAsync(match);
+        await _dbContext.Matches.InsertOneAsync(match);
 
         return GetResponse(match, playerMatch);
     }
 
     private async Task<Player> GetPlayer(string id)
     {
-        var matchCursor = await _players.FindAsync(m => m.Id == id);
+        var matchCursor = await _dbContext.Players.FindAsync(m => m.Id == id);
         return matchCursor.FirstOrDefault();
     }
     
@@ -104,7 +114,7 @@ public class DbService
         {
             //add player to collection
             player = new Player();
-            await _players.InsertOneAsync(player);
+            await _dbContext.Players.InsertOneAsync(player);
         }
         else
         {
@@ -124,7 +134,7 @@ public class DbService
 
         var filter = Builders<Match>.Filter.Eq("Id", matchId);
 
-        await _matches.ReplaceOneAsync(filter, match);
+        await _dbContext.Matches.ReplaceOneAsync(filter, match);
 
         return GetResponse(match, match.PlayerTwo);
     }
@@ -167,7 +177,7 @@ public class DbService
     /// <returns>Match</returns>
     public async Task<PlayerMatchResponse?> GetMatch(string matchId, string userId)
     {
-        var matchCursor = await _matches.FindAsync(m => m.Id == matchId);
+        var matchCursor = await _dbContext.Matches.FindAsync(m => m.Id == matchId);
         var match = matchCursor.FirstOrDefault();
 
         if (match == null)
@@ -177,10 +187,10 @@ public class DbService
 
         return GetResponse(match, match.PlayerOne.PlayerId == userId ? match.PlayerOne : match.PlayerTwo);
     }
-    
-    public async Task<Match?> GetMatch(string matchId)
+
+    private async Task<Match?> GetMatch(string matchId)
     {
-        var matchCursor = await _matches.FindAsync(m => m.Id == matchId);
+        var matchCursor = await _dbContext.Matches.FindAsync(m => m.Id == matchId);
         return matchCursor.FirstOrDefault();
 
     }
@@ -244,7 +254,7 @@ public class DbService
     public async Task<List<OpenMatchResponse>> GetOpenedMatches()
     {
         var filter = Builders<Match>.Filter.Where(m => m.PlayerTwo == null);
-        var matches = await _matches.Find(filter).ToListAsync();
+        var matches = await _dbContext.Matches.Find(filter).ToListAsync();
 
         return matches.Select(m => new OpenMatchResponse()
         {
@@ -262,7 +272,7 @@ public class DbService
     /// <exception cref="Exception"></exception>
     public async Task<PlayerMatchResponse> StartMatch(string matchId, string playerId)
     {
-        var matchCursor = await _matches.FindAsync(m=> m.Id == matchId);
+        var matchCursor = await _dbContext.Matches.FindAsync(m=> m.Id == matchId);
 
         var match = matchCursor.FirstOrDefault();
 
@@ -290,14 +300,13 @@ public class DbService
         }
 
         //shuffle cards
-        var cardService = new CardService();
-        var shuffledCards = cardService.ShuffleCards();
+        var shuffledCards = _cardService.ShuffleCards();
         
         //divide cards (one by one)
         var player1Cards = new List<int>();
         var player2Cards = new List<int>();
 
-        cardService.DivideCardsToPlayers(shuffledCards, player1Cards, player2Cards);
+        _cardService.DivideCardsToPlayers(shuffledCards, player1Cards, player2Cards);
             
         match.PlayerOne.Cards = player1Cards;
         match.PlayerTwo.Cards = player2Cards;
@@ -311,7 +320,7 @@ public class DbService
             .Set("StartTime", DateTime.UtcNow)
             ;
         
-        await _matches.UpdateOneAsync(filter, update);
+        await _dbContext.Matches.UpdateOneAsync(filter, update);
         
         return GetResponse(match, playerId == match.PlayerOne?.PlayerId ? match.PlayerOne : match.PlayerTwo);
     }
@@ -326,7 +335,7 @@ public class DbService
     public async Task<PlayerMatchResponse> DrawCard(string matchId, string userId)
     {
         //grab match
-        var r = await _matches.FindAsync(m=> m.Id == matchId && m.PlayerOne.PlayerId == userId || m.PlayerTwo.PlayerId == userId);
+        var r = await _dbContext.Matches.FindAsync(m=> m.Id == matchId && m.PlayerOne.PlayerId == userId || m.PlayerTwo.PlayerId == userId);
 
         var match = r.FirstOrDefault();
 
@@ -392,7 +401,7 @@ public class DbService
                 var updatePlayer = Builders<Player>.Update
                     .Inc("Wins", 1);
 
-                _ = await  _players.FindOneAndUpdateAsync(p => p.Id == matchWinner.PlayerId, updatePlayer); 
+                _ = await  _dbContext.Players.FindOneAndUpdateAsync(p => p.Id == matchWinner.PlayerId, updatePlayer); 
             }
             else
             {
@@ -405,7 +414,7 @@ public class DbService
             update = UpdatePlay(match, cardsToPlay);
         }
         
-        await _matches.UpdateOneAsync(filter, update);
+        await _dbContext.Matches.UpdateOneAsync(filter, update);
         return GetResponse(match, currentPlayer);
         
     }

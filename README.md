@@ -72,3 +72,8 @@ To get stats on a player, call:
 ## Notes
 * A player can start (open) unlimited matches - this could be a potential setting for a match
 * The only way to add a player is by starting or joining a match
+
+## If given more time I would've...
+* Write more unit tests
+* Support saving more user properties (name, etc.)
+* Write a client app (even a console app)

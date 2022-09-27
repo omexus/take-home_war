@@ -6,18 +6,18 @@ namespace war.Controllers;
 [Route("[controller]")]
 public class PlayerController : ControllerBase
 {
-    private readonly DbService _dbService;
+    private readonly IMatchService _matchService;
 
     // GET
     [HttpGet("{id}")]
     public async Task<IActionResult> GetPlayer(string id)
     {
-        var r = await _dbService.GetPlayerWithResponse(id);
+        var r = await _matchService.GetPlayerWithResponse(id);
         return Ok(r);
     }
 
-    public PlayerController(DbService service)
+    public PlayerController(IMatchService service)
     {
-        _dbService = service;
+        _matchService = service;
     }
 }
