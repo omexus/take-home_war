@@ -1,0 +1,20 @@
+#version: '3.4'
+#services:
+#  war-db:
+#    image: omexus/war-mongodb:first
+#    container_name: db
+#    restart: always
+#    volumes:
+#      - ${WEBAPP_STORAGE_HOME}/site:/data/db
+#    ports:
+#      - "27017:27017"
+#    
+#  war-api:
+#    container_name: api
+#    environment:
+#      - ASPNETCORE_ENVIRONMENT=Development
+#      - "Db:ConnectionString=mongodb://war-db:27017"
+#    depends_on:
+#      - war-db
+#    ports:
+#      - "8000:80"

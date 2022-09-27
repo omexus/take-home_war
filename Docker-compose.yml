@@ -1,0 +1,30 @@
+#version: '3.4'
+#services:
+#  war-db:
+#    image: mongo
+#    
+#  war-api:
+#    image: ${DOCKER_REGISTRY-}war-api
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+
+version: "3"
+services:
+  war.api:
+    container_name: war-api
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5671:80"
+      - "5672:443"
+    links:
+      - mongo.db
+  mongo.db:
+    container_name: war-db
+    restart: always
+    image: mongo
+    ports:
+      - "27017:27017"
