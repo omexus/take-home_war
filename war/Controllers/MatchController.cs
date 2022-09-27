@@ -28,28 +28,28 @@ public class MatchController : ControllerBase
         return Ok(matchResponse); 
     }
 
-    [HttpGet("openmatches")]
+    [HttpGet("list")]
     public async Task<IActionResult> Get()
     {
-        var r = await _dbService.GetOpenMatches();
+        var r = await _dbService.GetOpenedMatches();
         return Ok(r);
     }
     
-    [HttpPut("join/{matchId}")]
+    [HttpPut("{matchId}/join")]
     public async Task<IActionResult> Join(string matchId, [FromBody] PlayerRequest player)
     {
         var playerId = await _dbService.JoinMatch(matchId, player);
         return Ok(playerId);
     }
     
-    [HttpPut("start/{matchId}/{playerId}")]
+    [HttpPut("{matchId}/start/{playerId}")]
     public async Task<IActionResult> Start(string matchId, string playerId)
     {
-        await _dbService.StartMatch(matchId, playerId);
-        return Ok();
+        var response = await _dbService.StartMatch(matchId, playerId);
+        return Ok(response);
     }
     
-    [HttpPut("draw/{matchId}/{playerId}")]
+    [HttpPut("{matchId}/draw/{playerId}")]
     public async Task<IActionResult> Draw(string matchId, string playerId)
     {
         var response = await _dbService.DrawCard(matchId, playerId);

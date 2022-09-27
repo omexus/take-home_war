@@ -24,7 +24,7 @@ public class DbService
     }
 
     /// <summary>
-    /// A player decides to start a match (rather than joining an existing one)
+    /// A player decides to start (create) a new match (rather than joining an existing one)
     /// </summary>
     /// <param name="playerRequest"></param>
     /// <returns>matchId - newly created match</returns>
@@ -32,10 +32,11 @@ public class DbService
     {
         Player player;
         //if player is new, add it to the collection
-        if (playerRequest.Id == null)
+        if (playerRequest?.Id == null)
         {
             player = new Player();
             await _players.InsertOneAsync(player);
+            playerRequest ??= new PlayerRequest();
             playerRequest.Id = player.Id;
         }
         else
@@ -143,7 +144,19 @@ public class DbService
             CardsLeft = player.Cards?.Count() ?? 0,
             CurrentCard = player.CurrentCard,
             CardsOnPile = match.CardsOnPile?.Count ?? 0,
-            WinnerPlayerId = match.Winner
+            WinnerPlayerId = match.Winner,
+            PlayerOne = new PlayerMatchStateResponse()
+            {
+                CardsLeft = match.PlayerOne?.Cards?.Count ?? 0,
+                CurrentCard = match.PlayerOne?.CurrentCard ?? 0,
+                PlayerId = match.PlayerOne?.PlayerId
+            },
+            PlayerTwo = new PlayerMatchStateResponse()
+            {
+                CardsLeft = match.PlayerTwo?.Cards?.Count ?? 0,
+                CurrentCard = match.PlayerTwo?.CurrentCard ?? 0,
+                PlayerId = match.PlayerTwo?.PlayerId
+            }
         };
     }
 
@@ -228,7 +241,7 @@ public class DbService
     /// note: Player can always create a new match
     /// </summary>
     /// <returns>List of open matches</returns>
-    public async Task<List<OpenMatchResponse>> GetOpenMatches()
+    public async Task<List<OpenMatchResponse>> GetOpenedMatches()
     {
         var filter = Builders<Match>.Filter.Where(m => m.PlayerTwo == null);
         var matches = await _matches.Find(filter).ToListAsync();
@@ -242,12 +255,12 @@ public class DbService
     }
     
     /// <summary>
-    /// This assumes that a player wants to start a game 
+    /// This assumes that a player wants to start a match that is already created
     /// </summary>
     /// <param name="matchId"></param>
-    /// <param name="userId"></param>
+    /// <param name="playerId"></param>
     /// <exception cref="Exception"></exception>
-    public async Task StartMatch(string matchId, string userId)
+    public async Task<PlayerMatchResponse> StartMatch(string matchId, string playerId)
     {
         var matchCursor = await _matches.FindAsync(m=> m.Id == matchId);
 
@@ -263,7 +276,7 @@ public class DbService
             throw new ArgumentException($"Need another player");
         }
         
-        if (match.PlayerOne.PlayerId != userId && match.PlayerTwo.PlayerId != userId)
+        if (match.PlayerOne.PlayerId != playerId && match.PlayerTwo.PlayerId != playerId)
             throw new ArgumentException($"Not allowed to join match, spots are already taken");
 
         if (match.StartTime != null)
@@ -299,6 +312,8 @@ public class DbService
             ;
         
         await _matches.UpdateOneAsync(filter, update);
+        
+        return GetResponse(match, playerId == match.PlayerOne?.PlayerId ? match.PlayerOne : match.PlayerTwo);
     }
 
     /// <summary>
