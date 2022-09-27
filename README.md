@@ -58,7 +58,6 @@ Either player can join an existing match via
 ### Start a match
 Once a match has two players, it can be started by either player with
 * ```PUT``` http://localhost:5671/match/{matchid}/start/{playerId}
-* (optional) payload (if player already exists):
 
 ### Play a card
 Starting a match won't automatically draw a player's card, it would need to be explicitly called via

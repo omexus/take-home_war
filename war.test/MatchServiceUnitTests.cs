@@ -15,6 +15,7 @@ public class MatchServiceUnitTests
     private Mock<IMongoContext> _dbContext;
     private Mock<IMongoCollection<Player>> _playersCollectionMock;
     private Mock<IMongoCollection<Match>> _matchesCollectionMock;
+    private Mock<ICardService> _cardService;
 
     private List<Player> _players = new()
     {
@@ -37,13 +38,14 @@ public class MatchServiceUnitTests
     public MatchServiceUnitTests()
     {
         _dbContext = new Mock<IMongoContext>();
+        _cardService = new Mock<ICardService>();
         _playersCollectionMock = GetMockCollection<Player>(_players);
         _dbContext.Setup(s => s.Players).Returns(() => _playersCollectionMock.Object);
         
         _matchesCollectionMock = GetMockCollection<Match>(_matches);
         _dbContext.Setup(s => s.Matches).Returns(() => _matchesCollectionMock.Object);
         
-        _service = new MatchService(_dbContext.Object);
+        _service = new MatchService(_dbContext.Object, _cardService.Object);
 
     }
 
